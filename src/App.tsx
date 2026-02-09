@@ -2,7 +2,7 @@ import React from 'react';
 import { HashRouter as Router, Routes, Route } from 'react-router';
 import IntersectObserver from '@/components/common/IntersectObserver';
 import { MainLayout } from '@/components/layouts/MainLayout';
-import routes from './routes';
+import routes from './routes.tsx';
 import LoginPage from './pages/LoginPage';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { RouteGuard } from '@/components/common/RouteGuard';
