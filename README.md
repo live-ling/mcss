@@ -1,24 +1,6 @@
-# MCSS - Minecraft Server Sharing Platform
-
-A comprehensive platform for sharing and discovering Minecraft servers, built with React, TypeScript, and Python FastAPI.
-
 # MCSS - Minecraft 服务器分享平台
 
 一个功能全面的 Minecraft 服务器分享和发现平台，使用 React、TypeScript 和 Python FastAPI 构建。
-
-## Features
-
-- 🎮 Minecraft server listing and discovery
-- 👤 User authentication and profiles
-- 📷 Server image uploads
-- 🏷️ Server tagging and filtering
-- ⭐ Server likes and favorites
-- 💬 Server comments
-- 📧 Email verification and password reset
-- 🔍 Server status checking
-- 🎨 Responsive design with dark mode support
-- 👥 Admin and owner dashboards
-- 📱 Server notification system
 
 ## 功能特性
 
@@ -34,14 +16,6 @@ A comprehensive platform for sharing and discovering Minecraft servers, built wi
 - 👥 管理员和服务器所有者仪表盘
 - 📱 服务器通知系统
 
-## Tech Stack
-
-- **Frontend**: React, TypeScript, Vite, Tailwind CSS
-- **Backend**: Python, FastAPI, MySQL
-- **UI Components**: Radix UI, Lucide React
-- **Form Handling**: React Hook Form, Zod
-- **Routing**: React Router
-
 ## 技术栈
 
 - **前端**: React, TypeScript, Vite, Tailwind CSS
@@ -49,65 +23,6 @@ A comprehensive platform for sharing and discovering Minecraft servers, built wi
 - **UI 组件**: Radix UI, Lucide React
 - **表单处理**: React Hook Form, Zod
 - **路由**: React Router
-
-## Directory Structure
-
-```
-├── README.md              # Documentation
-├── LICENSE                # License file
-├── components.json        # UI component library configuration
-├── index.html             # Entry point
-├── package.json           # Package management
-├── postcss.config.js      # PostCSS configuration
-├── public                 # Static assets
-│   ├── favicon.ico        # Favicon
-│   └── images             # Image assets
-├── src                    # Frontend source code
-│   ├── components         # UI components
-│   │   ├── common         # Common components
-│   │   ├── layouts        # Layout components
-│   │   ├── server         # Server-related components
-│   │   └── ui             # UI components
-│   ├── contexts           # React contexts
-│   ├── db                 # API client configuration
-│   ├── hooks              # Custom hooks
-│   ├── lib                # Utility functions
-│   ├── pages              # Application pages
-│   ├── services           # API services
-│   ├── types              # TypeScript types
-│   ├── App.tsx            # Main application component
-│   ├── main.tsx           # Application entry
-│   ├── routes.tsx         # Route configuration
-│   └── index.css          # Global styles
-├── backend                # Backend source code
-│   ├── app                # Application code
-│   │   ├── api            # API endpoints
-│   │   ├── auth           # Authentication
-│   │   ├── config         # Configuration
-│   │   ├── schemas        # Data schemas
-│   │   ├── services       # Services
-│   │   └── utils          # Utility functions
-│   ├── uploads            # Uploaded files
-│   │   └── images         # Uploaded images
-│   ├── init_db.py         # Database initialization
-│   ├── init_db.sql        # Database schema
-│   ├── main.py            # Backend entry point
-│   └── requirements.txt   # Python dependencies
-├── .env.production        # Production environment variables
-├── .gitignore             # Git ignore file
-├── DEPLOYMENT.md          # Deployment documentation
-├── biome.json             # Biome configuration
-├── build.sh               # Build script
-├── pnpm-lock.yaml         # pnpm lock file
-├── pnpm-workspace.yaml    # pnpm workspace configuration
-├── tailwind.config.js     # Tailwind CSS configuration
-├── tsconfig.app.json      # TypeScript configuration for app
-├── tsconfig.check.json    # TypeScript configuration for checks
-├── tsconfig.json          # TypeScript configuration
-├── tsconfig.node.json     # TypeScript configuration for node
-├── vite.config.dev.ts     # Vite configuration for development
-└── vite.config.ts         # Vite configuration
-```
 
 ## 目录结构
 
@@ -167,98 +82,6 @@ A comprehensive platform for sharing and discovering Minecraft servers, built wi
 ├── vite.config.dev.ts     # 开发环境的 Vite 配置
 └── vite.config.ts         # Vite 配置
 ```
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js ≥ 20
-- npm ≥ 10 or pnpm ≥ 8
-- Python ≥ 3.10
-- MySQL ≥ 8.0
-
-### Local Development
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/live-ling/mcss.git
-   cd mcss
-   ```
-
-2. **Install frontend dependencies**
-   ```bash
-   npm install
-   # or
-   pnpm install
-   ```
-
-3. **Set up frontend environment variables**
-   Create a `.env` file in the root directory:
-   ```env
-   VITE_API_BASE_URL=http://localhost:8000/api
-   ```
-
-4. **Set up backend environment**
-   ```bash
-   cd backend
-   python -m venv venv
-   venv\Scripts\activate  # Windows
-   # source venv/bin/activate  # macOS/Linux
-   pip install -r requirements.txt
-   ```
-
-5. **Configure backend environment variables**
-   Create a `.env` file in the backend directory:
-   ```env
-   # Database configuration
-   DB_HOST=localhost
-   DB_PORT=3306
-   DB_USER=root
-   DB_PASSWORD=your-password
-   DB_NAME=mcss
-
-   # JWT configuration
-   SECRET_KEY=your-secret-key-here
-   ALGORITHM=HS256
-   ACCESS_TOKEN_EXPIRE_MINUTES=30
-   REFRESH_TOKEN_EXPIRE_DAYS=7
-
-   # Application configuration
-   APP_NAME=MCSS
-   APP_VERSION=1.0.0
-   DEBUG=True
-
-   # File upload configuration
-   UPLOAD_DIR=uploads
-   MAX_UPLOAD_SIZE=5242880
-
-   # SMTP configuration (optional)
-   # SMTP_HOST=smtp.example.com
-   # SMTP_PORT=587
-   # SMTP_USERNAME=your-email@example.com
-   # SMTP_PASSWORD=your-email-password
-   # SMTP_FROM_EMAIL=your-email@example.com
-   # SMTP_FROM_NAME=MCSS
-   # SMTP_USE_TLS=True
-   ```
-
-6. **Initialize database**
-   ```bash
-   python init_db.py
-   ```
-
-7. **Start the backend server**
-   ```bash
-   python main.py
-   ```
-
-8. **Start the frontend development server**
-   ```bash
-   cd ..
-   npm run dev
-   # or
-   pnpm dev
-   ```
 
 ## 开始使用
 
@@ -352,66 +175,6 @@ A comprehensive platform for sharing and discovering Minecraft servers, built wi
    pnpm dev
    ```
 
-## Deployment
-
-### Deploying to GitHub
-
-1. **Create a GitHub repository**
-   - Go to [GitHub](https://github.com/new) and create a new repository
-   - Push your code to the repository:
-     ```bash
-     git remote add origin https://github.com/your-username/mcss.git
-     git add .
-     git commit -m "Initial commit"
-     git push -u origin main
-     ```
-
-### Frontend Deployment
-
-You can deploy the frontend to any static hosting service like Cloudflare Pages, Vercel, or Netlify.
-
-#### Example: Cloudflare Pages
-
-1. **Connect to Cloudflare Pages**
-   - Go to [Cloudflare Pages](https://pages.cloudflare.com/)
-   - Click "Create a project"
-   - Connect your GitHub repository
-
-2. **Configure build settings**
-   - **Framework preset**: React
-   - **Build command**: `npm run build`
-   - **Build output directory**: `dist`
-   - **Root directory**: `/`
-
-3. **Set up environment variables**
-   - Add the following environment variables:
-     - `VITE_API_BASE_URL` - Your backend API URL
-
-4. **Deploy**
-   - Click "Save and Deploy"
-   - Wait for the deployment to complete
-
-### Backend Deployment
-
-You can deploy the backend to any Python hosting service like AWS, GCP, Azure, or a VPS.
-
-#### Example: VPS Deployment
-
-1. **Set up the server**
-   - Install Python, MySQL, and Nginx
-   - Create a MySQL database and user
-
-2. **Deploy the code**
-   - Clone the repository to your server
-   - Install dependencies
-   - Configure `.env` file
-   - Initialize database
-
-3. **Set up Gunicorn and Nginx**
-   - Install Gunicorn
-   - Create a systemd service for your backend
-   - Configure Nginx as a reverse proxy
-
 ## 部署
 
 ### 部署到 GitHub
@@ -472,29 +235,6 @@ You can deploy the backend to any Python hosting service like AWS, GCP, Azure, o
    - 为你的后端创建一个 systemd 服务
    - 配置 Nginx 作为反向代理
 
-## Database Configuration
-
-The database schema is defined in `backend/init_db.sql`. This file contains all the necessary tables for the application.
-
-### Tables
-
-- `users` - User accounts
-- `profiles` - User profiles
-- `servers` - Minecraft servers
-- `server_images` - Server images
-- `server_tags` - Server tags
-- `server_likes` - Server likes
-- `server_favorites` - Server favorites
-- `server_comments` - Server comments
-- `server_reports` - Server reports
-- `server_notification_configs` - Server notification configurations
-- `server_notification_records` - Server notification records
-- `smtp_config` - SMTP configuration for emails
-- `email_templates` - Email templates
-- `verification_codes` - Verification codes
-- `server_edit_requests` - Server edit requests
-- `site_settings` - Site settings
-
 ## 数据库配置
 
 数据库模式定义在 `backend/init_db.sql` 文件中。这个文件包含了应用所需的所有表。
@@ -517,40 +257,6 @@ The database schema is defined in `backend/init_db.sql`. This file contains all 
 - `verification_codes` - 验证码
 - `server_edit_requests` - 服务器编辑请求
 - `site_settings` - 站点设置
-
-## Environment Variables
-
-### Frontend
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `VITE_API_BASE_URL` | API base URL | Yes |
-
-### Backend
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `DB_HOST` | Database host | Yes |
-| `DB_PORT` | Database port | Yes |
-| `DB_USER` | Database user | Yes |
-| `DB_PASSWORD` | Database password | Yes |
-| `DB_NAME` | Database name | Yes |
-| `SECRET_KEY` | JWT secret key | Yes |
-| `ALGORITHM` | JWT algorithm | No (default: HS256) |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | Access token expiration | No (default: 30) |
-| `REFRESH_TOKEN_EXPIRE_DAYS` | Refresh token expiration | No (default: 7) |
-| `APP_NAME` | Application name | No (default: MCSS) |
-| `APP_VERSION` | Application version | No (default: 1.0.0) |
-| `DEBUG` | Debug mode | No (default: True) |
-| `UPLOAD_DIR` | Upload directory | No (default: uploads) |
-| `MAX_UPLOAD_SIZE` | Maximum upload size | No (default: 5MB) |
-| `SMTP_HOST` | SMTP server host | No |
-| `SMTP_PORT` | SMTP server port | No |
-| `SMTP_USERNAME` | SMTP username | No |
-| `SMTP_PASSWORD` | SMTP password | No |
-| `SMTP_FROM_EMAIL` | From email address | No |
-| `SMTP_FROM_NAME` | From name | No |
-| `SMTP_USE_TLS` | Use TLS | No (default: True) |
 
 ## 环境变量
 
@@ -586,18 +292,6 @@ The database schema is defined in `backend/init_db.sql`. This file contains all 
 | `SMTP_FROM_NAME` | 发件人名称 | 否 |
 | `SMTP_USE_TLS` | 使用 TLS | 否（默认: True） |
 
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-### Development Guidelines
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Open a Pull Request
-
 ## 贡献
 
 欢迎贡献！请随时提交 Pull Request。
@@ -618,16 +312,6 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 本项目借助 AI 技术开发，旨在为 Minecraft 服务器社区提供一个功能全面的分享平台。
 
-## Acknowledgements
-
-- [Radix UI](https://www.radix-ui.com/) for the UI components
-- [Tailwind CSS](https://tailwindcss.com/) for the styling
-- [Lucide React](https://lucide.dev/) for the icons
-- [FastAPI](https://fastapi.tiangolo.com/) for the backend framework
-- [React](https://react.dev/) for the frontend library
-- [TypeScript](https://www.typescriptlang.org/) for type safety
-- [UApiPro](https://uapis.cn/) for providing free, stable, and fast public APIs
-
 ## 致谢
 
 - [Radix UI](https://www.radix-ui.com/) 提供的 UI 组件
@@ -638,16 +322,9 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 - [TypeScript](https://www.typescriptlang.org/) 提供的类型安全
 - [UApiPro](https://uapis.cn/) 提供免费、稳定、快速的公共 API
 
-## Support
-
-If you have any questions or issues, please open an issue on GitHub or contact the maintainers.
-
 ## 支持
 
 如果你有任何问题或疑问，请在 GitHub 上打开一个 issue 或联系维护者。
 
 ---
 
-**Happy Minecraft server sharing!** 🎮
-
-**愉快的 Minecraft 服务器分享！** 🎮
