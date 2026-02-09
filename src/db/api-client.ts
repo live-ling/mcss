@@ -1,6 +1,27 @@
 // API客户端，用于与Python后端通信
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api-mcss.liveling.top';
+// 确保API_BASE_URL格式正确
+const getApiBaseUrl = () => {
+  // 获取环境变量中的API基础URL，如果没有则使用默认值
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+  
+  // 移除可能的多余斜杠和错误格式
+  let formattedUrl = baseUrl
+    .trim()
+    .replace(/\/$/, '') // 移除末尾的斜杠
+    .replace(/https\/\//g, 'https://') // 修复https://格式错误
+    .replace(/http\/\//g, 'http://'); // 修复http://格式错误
+  
+  // 确保URL包含协议
+  if (!/^https?:\/\//i.test(formattedUrl)) {
+    console.warn('API base URL missing protocol, adding https://');
+    formattedUrl = `https://${formattedUrl}`;
+  }
+  
+  return formattedUrl;
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 // 通用请求函数
 async function request<T>(
@@ -8,7 +29,17 @@ async function request<T>(
   options: RequestInit = {}
 ): Promise<T> {
   // 确保 URL 拼接时不会产生连续的斜杠
-  const url = `${API_BASE_URL.replace(/\/$/, '')}${endpoint.replace(/^\/*/, '/')}`;
+  const url = `${API_BASE_URL}${endpoint.replace(/^\/*/, '/')}`;
+  
+  // 验证URL格式
+  try {
+    new URL(url);
+  } catch (error) {
+    console.error('Invalid API URL:', url);
+    console.error('API_BASE_URL:', API_BASE_URL);
+    console.error('Endpoint:', endpoint);
+    throw new Error('Invalid API URL format. Please check your VITE_API_BASE_URL environment variable.');
+  }
   
   // 获取token
   const token = localStorage.getItem('access_token');
