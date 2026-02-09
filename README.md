@@ -193,7 +193,7 @@ A comprehensive platform for sharing and discovering Minecraft servers, built wi
    ```
 
 3. **Set up frontend environment variables**
-   Create a `.env.production` file in the root directory:
+   Create a `.env` file in the root directory:
    ```env
    VITE_API_BASE_URL=http://localhost:8000/api
    ```
@@ -285,7 +285,7 @@ A comprehensive platform for sharing and discovering Minecraft servers, built wi
    ```
 
 3. **设置前端环境变量**
-   在根目录创建 `.env.production` 文件：
+   在根目录创建 `.env` 文件：
    ```env
    VITE_API_BASE_URL=http://localhost:8000/api
    ```
