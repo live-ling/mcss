@@ -360,6 +360,42 @@ export const serverApi = {
       method: 'DELETE',
     });
   },
+  
+  // 获取服务器在线人数历史数据
+  async getPlayerCountHistory(serverId: string, options?: { start_time?: string, end_time?: string, time_range?: string }) {
+    const { start_time, end_time, time_range } = options || {};
+    const queryParams = new URLSearchParams();
+    
+    if (start_time) {
+      queryParams.append('start_time', start_time);
+    }
+    if (end_time) {
+      queryParams.append('end_time', end_time);
+    }
+    if (time_range) {
+      queryParams.append('time_range', time_range);
+    }
+    
+    const queryString = queryParams.toString();
+    const endpoint = `/servers/${serverId}/player-count-history${queryString ? `?${queryString}` : ''}`;
+    
+    console.log('API Request: getPlayerCountHistory', {
+      serverId,
+      start_time,
+      end_time,
+      time_range,
+      endpoint
+    });
+    
+    try {
+      const response = await request<any>(endpoint);
+      console.log('API Response: getPlayerCountHistory', response);
+      return response;
+    } catch (error) {
+      console.error('API Error: getPlayerCountHistory', error);
+      throw error;
+    }
+  },
 };
 
 // 用户相关API
@@ -624,6 +660,26 @@ export const adminApi = {
       method: 'POST',
       body: JSON.stringify(settings),
     });
+  },
+  
+  // 获取统计数据
+  async getStats() {
+    return request<any>('/admin/stats');
+  },
+  
+  // 获取服务器在线玩家统计数据
+  async getPlayerCountStats(timeRange: string = '24h', serverIds?: string[]) {
+    const queryParams = new URLSearchParams();
+    queryParams.append('time_range', timeRange);
+    
+    if (serverIds && serverIds.length > 0) {
+      queryParams.append('server_ids', serverIds.join(','));
+    }
+    
+    const queryString = queryParams.toString();
+    const endpoint = `/admin/stats/player-count${queryString ? `?${queryString}` : ''}`;
+    
+    return request<any>(endpoint);
   },
 };
 

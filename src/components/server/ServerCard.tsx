@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Eye, Users, Heart } from 'lucide-react';
 import type { ServerDetail, ServerOnlineStatus } from '@/types';
 import { cn } from '@/lib/utils';
+import { serverApi } from '@/db/api-client';
 
 interface ServerCardProps {
   server: ServerDetail;
@@ -56,25 +57,21 @@ export function ServerCard({ server, className, actions }: ServerCardProps) {
   // 查询服务器状态
   const checkServerStatus = async (address: string): Promise<ServerOnlineStatus> => {
     try {
-      // 使用第三方API查询服务器状态
-      const response = await fetch(`https://uapis.cn/api/v1/game/minecraft/serverstatus?server=${encodeURIComponent(address)}`);
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || '查询失败');
-      }
-      
-      const data = await response.json();
+      // 使用与服务器详情页相同的逻辑查询服务器状态
+      const data = await serverApi.checkServerStatus(address);
       
       return {
         online: data.online || false,
-        players: {
-          online: data.players || 0,
-          max: data.max_players || (server.max_players || 0)
+        players: data.players ? {
+          online: data.players.online || 0,
+          max: data.players.max || (server.max_players || 0)
+        } : {
+          online: 0,
+          max: server.max_players || 0
         },
         version: data.version,
-        motd: data.motd_clean,
-        faviconUrl: data.favicon_url
+        motd: data.motd,
+        faviconUrl: data.faviconUrl
       };
     } catch (error) {
       console.error('查询服务器状态失败:', error);

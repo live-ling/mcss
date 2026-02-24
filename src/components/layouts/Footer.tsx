@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { publicApi } from '@/db/api-client';
 import type { SiteSettings } from '@/types';
+import { Github } from 'lucide-react';
 
 export function Footer() {
   const location = useLocation();
@@ -75,6 +76,11 @@ export function Footer() {
                 <p className="text-sm text-muted-foreground">
                   MinecraftXF寻你所寻
                 </p>
+                <div className="flex space-x-4">
+                  <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors">
+                    <Github className="h-5 w-5" />
+                  </a>
+                </div>
               </div>
 
               {/* 联系我们 */}
@@ -117,16 +123,6 @@ export function Footer() {
                 <h3 className="text-sm font-semibold uppercase tracking-wider text-black">快速链接</h3>
                 <ul className="space-y-2 text-sm">
                   <li>
-                    <Link to="/" className="text-muted-foreground hover:text-primary transition-colors">
-                      首页
-                    </Link>
-                  </li>
-                  <li>
-                    <Link to="/servers" className="text-muted-foreground hover:text-primary transition-colors">
-                      服务器列表
-                    </Link>
-                  </li>
-                  <li>
                     <Link to="/about" className="text-muted-foreground hover:text-primary transition-colors">
                       关于我们
                     </Link>
@@ -151,7 +147,6 @@ export function Footer() {
                   请遵守社区守则，文明互动，共建和谐社区。
                 </p>
                 <ul className="space-y-2 text-sm text-muted-foreground">
-                  <li>• 禁止发布虚假服务器信息</li>
                   <li>• 禁止恶意抹黑其他服务器</li>
                   <li>• 维护公益服生态环境</li>
                 </ul>

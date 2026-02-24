@@ -177,6 +177,22 @@ export interface ServerFormData {
   images: File[];
 }
 
+// 服务器在线人数历史记录
+export interface PlayerCountHistory {
+  id: string;
+  timestamp: string;
+  player_count: number;
+  max_players: number | null;
+  created_at: string;
+}
+
+// 服务器在线人数历史响应
+export interface PlayerCountHistoryResponse {
+  server_id: string;
+  total_records: number;
+  data: PlayerCountHistory[];
+}
+
 // 评论表单数据
 export interface CommentFormData {
   server_id: string;

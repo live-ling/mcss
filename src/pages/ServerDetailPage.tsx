@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import PageMeta from '@/components/common/PageMeta';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -19,6 +20,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { serverApi, commentApi } from '@/db/api-client';
+
 import type { ServerDetail, ServerComment, ServerOnlineStatus } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -54,6 +56,8 @@ export default function ServerDetailPage() {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [serverStatus, setServerStatus] = useState<ServerOnlineStatus | null>(null);
   const [checkingStatus, setCheckingStatus] = useState(false);
+  const [playerCountHistory, setPlayerCountHistory] = useState<any[]>([]);
+  const [loadingPlayerCountHistory, setLoadingPlayerCountHistory] = useState(false);
 
   // 查询服务器状态
   const fetchServerStatus = async () => {
@@ -67,6 +71,21 @@ export default function ServerDetailPage() {
       console.error('查询服务器状态失败:', error);
     } finally {
       setCheckingStatus(false);
+    }
+  };
+
+  // 获取24小时在线人数历史数据
+  const fetchPlayerCountHistory = async () => {
+    if (!user || !server) return;
+    
+    setLoadingPlayerCountHistory(true);
+    try {
+      const history = await serverApi.getPlayerCountHistory(server.id, { time_range: '24h' });
+      setPlayerCountHistory(history.data || []);
+    } catch (error) {
+      console.error('获取在线人数历史数据失败:', error);
+    } finally {
+      setLoadingPlayerCountHistory(false);
     }
   };
 
@@ -97,6 +116,13 @@ export default function ServerDetailPage() {
       fetchServerStatus();
     }
   }, [server?.id]);
+
+  // 用户登录且服务器加载完成后获取在线人数历史数据
+  useEffect(() => {
+    if (user && server) {
+      fetchPlayerCountHistory();
+    }
+  }, [user?.id, server?.id]);
 
   const handleLike = async () => {
     if (!user || !server) {
@@ -616,6 +642,80 @@ export default function ServerDetailPage() {
                         加入群聊
                       </a>
                     </Button>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+            
+            {/* 24小时在线人数统计 */}
+            {user && (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle>24小时在线人数统计</CardTitle>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={fetchPlayerCountHistory}
+                      disabled={loadingPlayerCountHistory}
+                    >
+                      <RefreshCw className={`h-3 w-3 ${loadingPlayerCountHistory ? 'animate-spin' : ''}`} />
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {loadingPlayerCountHistory ? (
+                    <div className="h-40 flex items-center justify-center">
+                      <Skeleton className="h-32 w-full bg-muted" />
+                    </div>
+                  ) : playerCountHistory.length > 0 ? (
+                    <div className="h-40">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart
+                          data={playerCountHistory}
+                          margin={{ top: 5, right: 5, left: -20, bottom: 5 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                          <XAxis 
+                            dataKey="timestamp" 
+                            tick={{ fontSize: 10 }} 
+                            tickFormatter={(value) => {
+                              const date = new Date(value);
+                              return date.getHours() + ':00';
+                            }}
+                          />
+                          <YAxis 
+                            tick={{ fontSize: 10 }} 
+                            domain={[0, 'dataMax + 5']}
+                          />
+                          <Tooltip 
+                            formatter={(value) => [`${value} 人`, '在线人数']}
+                            labelFormatter={(value) => {
+                              const date = new Date(value);
+                              return date.toLocaleString('zh-CN', {
+                                month: '2-digit',
+                                day: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              });
+                            }}
+                          />
+                          <Line 
+                            type="monotone" 
+                            dataKey="player_count" 
+                            stroke="#3b82f6" 
+                            strokeWidth={2} 
+                            dot={false}
+                            activeDot={{ r: 4 }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className="h-40 flex items-center justify-center">
+                      <p className="text-sm text-muted-foreground">暂无24小时在线人数数据</p>
+                    </div>
                   )}
                 </CardContent>
               </Card>

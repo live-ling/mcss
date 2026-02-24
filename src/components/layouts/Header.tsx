@@ -72,7 +72,7 @@ export function Header() {
                   )}
                   {profile.role === 'admin' && (
                     <DropdownMenuItem asChild>
-                      <Link to="/admin">管理后台</Link>
+                      <Link to="/admin">控制台</Link>
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuSeparator />
@@ -119,27 +119,17 @@ export function Header() {
                     <Link to="/profile">用户中心</Link>
                   </DropdownMenuItem>
                   {(profile.role === 'owner' || profile.role === 'admin') && (
-                    <DropdownMenuItem asChild>
-                      <Link to="/owner">服主中心</Link>
-                    </DropdownMenuItem>
+                    <>
+                      <DropdownMenuItem asChild>
+                        <Link to="/owner">服主中心</Link>
+                      </DropdownMenuItem>
+                    </>
                   )}
                   {profile.role === 'admin' && (
                     <>
-                      <DropdownMenuItem asChild>
-                        <Link to="/admin">管理后台</Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link to="/admin/servers">服务器管理</Link>
-                      </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem asChild>
-                        <Link to="/admin/site-settings">页脚设置</Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link to="/admin/smtp">SMTP设置</Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link to="/admin/email-templates">邮件模板</Link>
+                        <Link to="/admin">控制台</Link>
                       </DropdownMenuItem>
                     </>
                   )}

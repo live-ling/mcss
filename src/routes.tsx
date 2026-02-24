@@ -5,10 +5,6 @@ import LoginPage from './pages/LoginPage';
 import ProfilePage from './pages/ProfilePage';
 import OwnerPage from './pages/OwnerPage';
 import AdminPage from './pages/AdminPage';
-import SiteSettingsPage from './pages/admin/SiteSettingsPage';
-import SmtpSettingsPage from './pages/admin/SmtpSettingsPage';
-import EmailTemplatesPage from './pages/admin/EmailTemplatesPage';
-import ServerManagementPage from './pages/admin/ServerManagementPage';
 import TermsPage from './pages/TermsPage';
 import PrivacyPage from './pages/PrivacyPage';
 import AboutPage from './pages/AboutPage';
@@ -61,22 +57,22 @@ const routes: RouteConfig[] = [
   {
     name: '服务器管理',
     path: '/admin/servers',
-    element: <ServerManagementPage />
+    element: <AdminPage />
   },
   {
     name: '联系我们设置',
     path: '/admin/site-settings',
-    element: <SiteSettingsPage />
+    element: <AdminPage />
   },
   {
     name: 'SMTP设置',
     path: '/admin/smtp',
-    element: <SmtpSettingsPage />
+    element: <AdminPage />
   },
   {
     name: '邮件模板',
     path: '/admin/email-templates',
-    element: <EmailTemplatesPage />
+    element: <AdminPage />
   },
   {
     name: '服务条款',

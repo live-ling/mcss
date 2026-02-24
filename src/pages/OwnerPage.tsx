@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,13 +23,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { ImageUpload } from '@/components/common/ImageUpload';
+import { PlayerCountHistoryChart } from '@/components/server/PlayerCountHistoryChart';
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
-import { ImageUpload } from '@/components/common/ImageUpload';
 import { useAuth } from '@/contexts/AuthContext';
 import { serverApi } from '@/db/api-client';
 import type { ServerDetail, ServerFormData, GameVersion, ServerType } from '@/types';
@@ -80,6 +81,11 @@ export default function OwnerPage() {
   const [originalNotificationConfig, setOriginalNotificationConfig] = useState<any>(null);
   const [isSavingConfig, setIsSavingConfig] = useState(false);
   const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
+  
+  // 在线人数历史统计模态框状态
+  const [playerCountHistoryDialogOpen, setPlayerCountHistoryDialogOpen] = useState(false);
+  const [selectedServerId, setSelectedServerId] = useState<string | null>(null);
+  const [selectedServerName, setSelectedServerName] = useState<string | null>(null);
   
   // 通知记录管理
   const [notificationLoading, setNotificationLoading] = useState(false);
@@ -288,9 +294,14 @@ export default function OwnerPage() {
   const loadNotificationConfig = async (serverId: string) => {
     try {
       const config = await serverApi.getServerNotificationConfig(serverId);
+      // 确保配置中包含 player_count_enabled 字段
+      const configWithDefaults = {
+        ...config,
+        player_count_enabled: config.player_count_enabled || false
+      };
       setNotificationConfigs(prev => ({
         ...prev,
-        [serverId]: config
+        [serverId]: configWithDefaults
       }));
     } catch (error) {
       console.error(`加载服务器 ${serverId} 通知配置失败:`, error);
@@ -441,6 +452,13 @@ export default function OwnerPage() {
       console.error('删除失败:', error);
       toast.error('删除失败');
     }
+  };
+  
+  // 打开在线人数历史统计模态框
+  const openPlayerCountHistoryDialog = (serverId: string, serverName: string) => {
+    setSelectedServerId(serverId);
+    setSelectedServerName(serverName);
+    setPlayerCountHistoryDialogOpen(true);
   };
 
   const resetForm = () => {
@@ -754,6 +772,29 @@ export default function OwnerPage() {
                           />
                         </div>
                         
+                        {/* 启用/禁用在线人数统计 */}
+                        <div className="flex items-center justify-between space-y-0">
+                          <div className="space-y-1">
+                            <Label htmlFor="player-count-enabled">启用在线人数统计</Label>
+                            <p className="text-xs text-muted-foreground">
+                              统计并显示服务器在线人数
+                            </p>
+                          </div>
+                          <Switch
+                            id="player-count-enabled"
+                            checked={notificationConfigs[currentServerId].player_count_enabled || false}
+                            onCheckedChange={(checked) => {
+                              setNotificationConfigs(prev => ({
+                                ...prev,
+                                [currentServerId]: {
+                                  ...prev[currentServerId],
+                                  player_count_enabled: checked
+                                }
+                              }));
+                            }}
+                          />
+                        </div>
+                        
                         {/* 服务器优先级 */}
                         <div className="space-y-2">
                           <Label htmlFor="server-priority">服务器优先级</Label>
@@ -933,11 +974,37 @@ export default function OwnerPage() {
           </Dialog>
         </div>
         
+        {/* 在线人数历史统计模态框 */}
+        <Dialog open={playerCountHistoryDialogOpen} onOpenChange={(open) => {
+          setPlayerCountHistoryDialogOpen(open);
+          if (!open) {
+            setSelectedServerId(null);
+            setSelectedServerName(null);
+          }
+        }}>
+          <DialogContent className="max-w-4xl w-full sm:max-w-3xl md:max-w-4xl lg:max-w-5xl">
+            {selectedServerId && selectedServerName && (
+              <>
+                <DialogHeader>
+                  <DialogTitle>在线人数历史统计 - {selectedServerName}</DialogTitle>
+                  <DialogDescription>
+                    查看服务器的在线人数历史记录和变化趋势
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="mt-4">
+                  <PlayerCountHistoryChart serverId={selectedServerId} />
+                </div>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
+        
         {/* 选项卡 */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="w-full max-w-md">
             <TabsTrigger value="servers" className="flex-1">服务器列表</TabsTrigger>
             <TabsTrigger value="notification-settings" className="flex-1">通知设置</TabsTrigger>
+            <TabsTrigger value="player-count" className="flex-1">人数统计</TabsTrigger>
             <TabsTrigger value="notification-records" className="flex-1">通知记录</TabsTrigger>
           </TabsList>
           <TabsContent value="servers" className="mt-6">
@@ -1004,7 +1071,8 @@ export default function OwnerPage() {
                               setNotificationDialogOpen(true);
                             }}
                           >
-                            <Settings className="h-4 w-4" />
+                            <Settings className="h-4 w-4 mr-1" />
+                            配置
                           </Button>
                           <Button
                             variant="outline"
@@ -1031,6 +1099,9 @@ export default function OwnerPage() {
                             <div className="flex items-center gap-1">
                               <Badge variant={config.notify_enabled ? 'default' : 'outline'}>
                                 {config.notify_enabled ? '通知已启用' : '通知已禁用'}
+                              </Badge>
+                              <Badge variant={config.player_count_enabled ? 'default' : 'outline'}>
+                                {config.player_count_enabled ? '人数统计已启用' : '人数统计已禁用'}
                               </Badge>
                             </div>
                           )}
@@ -1136,6 +1207,12 @@ export default function OwnerPage() {
                                   </Badge>
                                 </div>
                                 <div className="flex items-center justify-between">
+                                  <span className="text-sm">在线人数统计</span>
+                                  <Badge variant={config.player_count_enabled ? 'default' : 'outline'}>
+                                    {config.player_count_enabled ? '已启用' : '已禁用'}
+                                  </Badge>
+                                </div>
+                                <div className="flex items-center justify-between">
                                   <span className="text-sm">检查间隔</span>
                                   <span className="text-sm">{config.check_interval} 秒</span>
                                 </div>
@@ -1155,6 +1232,118 @@ export default function OwnerPage() {
                                 尚未配置通知设置
                               </p>
                             )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-center text-muted-foreground">
+                    还没有添加任何服务器
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          <TabsContent value="player-count" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>人数统计</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  配置服务器在线人数统计功能
+                </p>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <p className="text-center text-muted-foreground">加载中...</p>
+                ) : servers.length > 0 ? (
+                  <div className="space-y-4">
+                    {servers.map((server) => {
+                      const status = serverStatuses[server.id] || { online: false, loading: false };
+                      const config = notificationConfigs[server.id];
+                      
+                      return (
+                        <Card key={server.id} className="border">
+                          <CardHeader className="pb-2">
+                            <div className="flex items-start justify-between">
+                              <CardTitle className="line-clamp-1">{server.name}</CardTitle>
+                              <div className="flex flex-col items-end gap-1">
+                                <Badge variant={server.status === 'approved' ? 'default' : server.status === 'pending' ? 'secondary' : 'destructive'}>
+                                  {STATUS_LABELS[server.status]}
+                                </Badge>
+                                <div className="flex items-center gap-1">
+                                  {status.loading ? (
+                                    <RefreshCw className="h-3 w-3 animate-spin text-muted-foreground" />
+                                  ) : (
+                                    <>
+                                      <Badge 
+                                        variant={status.online ? 'outline' : 'destructive'}
+                                        className={`transition-all duration-300 ${status.online ? 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900 dark:text-green-200 dark:border-green-800' : 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900 dark:text-red-200 dark:border-red-800'}`}
+                                      >
+                                        {status.online ? '在线' : '离线'}
+                                      </Badge>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="pt-0">
+                            <div className="space-y-4">
+                              <div className="flex items-center justify-between space-y-0">
+                                <div className="space-y-1">
+                                  <Label htmlFor={`player-count-${server.id}`}>启用在线人数统计</Label>
+                                  <p className="text-xs text-muted-foreground">
+                                    统计并显示服务器在线人数，每5分钟记录一次历史数据
+                                  </p>
+                                </div>
+                                <Switch
+                                  id={`player-count-${server.id}`}
+                                  checked={config?.player_count_enabled || false}
+                                  onCheckedChange={(checked) => {
+                                    setNotificationConfigs(prev => ({
+                                      ...prev,
+                                      [server.id]: {
+                                        ...prev[server.id],
+                                        player_count_enabled: checked
+                                      }
+                                    }));
+                                    // 保存配置
+                                    const updatedConfig = {
+                                      ...config,
+                                      player_count_enabled: checked
+                                    };
+                                    serverApi.updateServerNotificationConfig(server.id, updatedConfig)
+                                      .then(() => {
+                                        toast.success('人数统计设置已保存');
+                                      })
+                                      .catch((error) => {
+                                        console.error('保存人数统计设置失败:', error);
+                                        toast.error('保存人数统计设置失败');
+                                      });
+                                  }}
+                                />
+                              </div>
+                              {config?.player_count_enabled && status.players && (
+                                <div className="p-3 bg-muted rounded-md">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-sm font-medium">当前在线人数</span>
+                                    <span className="text-sm">{status.players.online} / {status.players.max || '?'}</span>
+                                  </div>
+                                </div>
+                              )}
+                              {config?.player_count_enabled && (
+                                <div className="mt-4">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => openPlayerCountHistoryDialog(server.id, server.name)}
+                                  >
+                                    查看历史在线人数
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
                           </CardContent>
                         </Card>
                       );
