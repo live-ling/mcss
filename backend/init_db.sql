@@ -13,15 +13,15 @@ create table if not exists email_templates
 
 create table if not exists site_settings
 (
-    id               int auto_increment
+    id              int auto_increment
         primary key,
-    contact_email    varchar(255)                        not null,
-    qq_group         varchar(20)                         not null,
-    qq_group_link    varchar(255)                        null,
-    icp_record       varchar(100)                        null,
-    police_record    varchar(100)                        null,
-    icp_record_link  varchar(255)                        null,
-    updated_at       timestamp default CURRENT_TIMESTAMP null on update CURRENT_TIMESTAMP
+    contact_email   varchar(255)                        not null,
+    qq_group        varchar(20)                         null,
+    qq_group_link   varchar(255)                        null,
+    updated_at      timestamp default CURRENT_TIMESTAMP null on update CURRENT_TIMESTAMP,
+    icp_record      varchar(100)                        null,
+    police_record   varchar(100)                        null,
+    icp_record_link varchar(255)                        null
 );
 
 create table if not exists smtp_config
@@ -95,8 +95,8 @@ create table if not exists servers
     status             enum ('pending', 'approved', 'rejected', 'offline') default 'pending'                       null,
     featured           tinyint(1)                                          default 0                               null,
     view_count         int                                                 default 0                               null,
-    group_number       varchar(20)                                          null,
-    group_link         varchar(255)                                         null,
+    group_number       varchar(20)                                                                                 null,
+    group_link         varchar(255)                                                                                null,
     created_at         timestamp                                           default CURRENT_TIMESTAMP               null,
     updated_at         timestamp                                           default CURRENT_TIMESTAMP               null on update CURRENT_TIMESTAMP,
     constraint servers_ibfk_1
@@ -210,6 +210,97 @@ create table if not exists server_likes
 create index user_id
     on server_likes (user_id);
 
+create table if not exists server_notification_configs
+(
+    id                   varchar(36)                                                  not null
+        primary key,
+    server_id            varchar(36)                                                  not null,
+    notify_enabled       tinyint(1)                         default 0                 null,
+    player_count_enabled tinyint(1)                         default 0                 null,
+    check_interval       int                                default 30                null,
+    notification_email   varchar(255)                                                 null,
+    email_verified       tinyint(1)                         default 0                 null,
+    server_priority      enum ('main', 'secondary', 'test') default 'secondary'       null,
+    created_at           timestamp                          default CURRENT_TIMESTAMP null,
+    updated_at           timestamp                          default CURRENT_TIMESTAMP null on update CURRENT_TIMESTAMP,
+    constraint server_notification_configs_ibfk_1
+        foreign key (server_id) references servers (id)
+            on delete cascade
+);
+
+create index server_id
+    on server_notification_configs (server_id);
+
+create table if not exists server_notification_records
+(
+    id                varchar(36)                                       not null
+        primary key,
+    server_id         varchar(36)                                       not null,
+    owner_id          varchar(36)                                       not null,
+    notification_type enum ('offline', 'online')                        not null,
+    message           text                                              not null,
+    status            enum ('read', 'unread') default 'unread'          not null,
+    created_at        timestamp               default CURRENT_TIMESTAMP not null,
+    updated_at        timestamp               default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP,
+    constraint server_notification_records_ibfk_1
+        foreign key (server_id) references servers (id)
+            on delete cascade,
+    constraint server_notification_records_ibfk_2
+        foreign key (owner_id) references users (id)
+            on delete cascade
+);
+
+create index idx_created_at
+    on server_notification_records (created_at);
+
+create index idx_notification_type
+    on server_notification_records (notification_type);
+
+create index idx_owner_id
+    on server_notification_records (owner_id);
+
+create index idx_server_id
+    on server_notification_records (server_id);
+
+create index idx_status
+    on server_notification_records (status);
+
+create table if not exists server_offline_events
+(
+    id                       varchar(36)                         not null
+        primary key,
+    server_id                varchar(36)                         not null,
+    offline_start_timestamp  bigint                              not null,
+    online_timestamp         bigint                              null,
+    offline_duration_seconds int                                 null,
+    notification_sent_at     timestamp default CURRENT_TIMESTAMP null,
+    created_at               timestamp default CURRENT_TIMESTAMP null,
+    updated_at               timestamp default CURRENT_TIMESTAMP null on update CURRENT_TIMESTAMP,
+    constraint server_offline_events_ibfk_1
+        foreign key (server_id) references servers (id)
+            on delete cascade
+);
+
+create index idx_offline_start
+    on server_offline_events (offline_start_timestamp);
+
+create index idx_server_id_offline
+    on server_offline_events (server_id);
+
+create table if not exists server_player_count_history
+(
+    id           varchar(36)                         not null
+        primary key,
+    server_id    varchar(36)                         not null,
+    timestamp    timestamp default CURRENT_TIMESTAMP not null,
+    player_count int       default 0                 not null,
+    max_players  int                                 null,
+    created_at   timestamp default CURRENT_TIMESTAMP not null,
+    constraint server_player_count_history_ibfk_1
+        foreign key (server_id) references servers (id)
+            on delete cascade
+);
+
 create table if not exists server_reports
 (
     id          varchar(36)                                           not null
@@ -267,15 +358,15 @@ create index owner_id
 
 create table if not exists verification_codes
 (
-    id         varchar(36)                                             not null
+    id         varchar(36)                                                                                               not null
         primary key,
-    user_id    varchar(36)                                             null,
-    email      varchar(255)                                            not null,
-    code       varchar(10)                                             not null,
+    user_id    varchar(36)                                                                                               null,
+    email      varchar(255)                                                                                              not null,
+    code       varchar(10)                                                                                               not null,
     type       enum ('email_change', 'email_verify', 'password_reset', 'owner_verification', 'register', 'email_update') not null,
-    expires_at timestamp                                               not null,
-    used       tinyint(1) default 0                                    null,
-    created_at timestamp  default CURRENT_TIMESTAMP                    null,
+    expires_at timestamp                                                                                                 not null,
+    used       tinyint(1) default 0                                                                                      null,
+    created_at timestamp  default CURRENT_TIMESTAMP                                                                      null,
     constraint verification_codes_ibfk_1
         foreign key (user_id) references users (id)
             on delete cascade
@@ -284,56 +375,3 @@ create table if not exists verification_codes
 create index user_id
     on verification_codes (user_id);
 
-create table if not exists server_notification_configs
-(
-    id                 varchar(36)                         not null
-        primary key,
-    server_id          varchar(36)                         not null,
-    notify_enabled     tinyint(1) default 0                null,
-    check_interval     int       default 30                null,
-    notification_email varchar(255)                        null,
-    email_verified     tinyint(1) default 0                null,
-    server_priority    enum ('main', 'secondary', 'test')  default 'secondary' null,
-    created_at         timestamp default CURRENT_TIMESTAMP null,
-    updated_at         timestamp default CURRENT_TIMESTAMP null on update CURRENT_TIMESTAMP,
-    constraint server_notification_configs_ibfk_1
-        foreign key (server_id) references servers (id)
-            on delete cascade
-);
-
-create index server_id
-    on server_notification_configs (server_id);
-
-create table if not exists server_notification_records
-(
-    id                varchar(36)                         not null
-        primary key,
-    server_id         varchar(36)                         not null,
-    owner_id          varchar(36)                         not null,
-    notification_type enum ('offline', 'online')          not null,
-    message           text                                not null,
-    status            enum ('read', 'unread') default 'unread' not null,
-    created_at        timestamp default CURRENT_TIMESTAMP not null,
-    updated_at        timestamp default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP,
-    constraint server_notification_records_ibfk_1
-        foreign key (server_id) references servers (id)
-            on delete cascade,
-    constraint server_notification_records_ibfk_2
-        foreign key (owner_id) references users (id)
-            on delete cascade
-);
-
-create index idx_server_id
-    on server_notification_records (server_id);
-
-create index idx_owner_id
-    on server_notification_records (owner_id);
-
-create index idx_status
-    on server_notification_records (status);
-
-create index idx_created_at
-    on server_notification_records (created_at);
-
-create index idx_notification_type
-    on server_notification_records (notification_type);

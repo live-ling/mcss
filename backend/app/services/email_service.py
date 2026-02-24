@@ -10,6 +10,7 @@ from email.header import Header
 from typing import Optional
 from app.utils.database import db
 from app.config.settings import settings
+from app.services.email_template_service import email_template_service
 
 
 class EmailService:
@@ -78,46 +79,47 @@ class EmailService:
             print(f"Error sending email: {e}")
             return False
     
+    async def send_email_with_template(self, to_email: str, template_name: str, variables: dict, is_html: bool = False) -> bool:
+        """
+        使用模板发送邮件
+        """
+        try:
+            # 渲染模板
+            rendered = email_template_service.render_template(template_name, variables)
+            if not rendered:
+                print(f"Failed to render template: {template_name}")
+                return False
+            
+            # 发送邮件
+            return await self.send_email(
+                to_email,
+                rendered['subject'],
+                rendered['body'],
+                is_html
+            )
+        except Exception as e:
+            print(f"Error sending email with template: {e}")
+            return False
+    
     async def send_verification_email(self, to_email: str, server_name: str) -> bool:
         """
         发送邮箱验证测试邮件
         """
-        subject = f"【MCSS】服务器 {server_name} 邮箱验证测试"
-        body = f"""
-        尊敬的服主：
-        
-        这是一封服务器 {server_name} 的邮箱验证测试邮件，用于确认您的邮箱可以正常接收服务器离线通知。
-        
-        如果您收到此邮件，说明您的邮箱配置正确，当服务器离线时，您将收到相应的通知邮件。
-        
-        如有疑问，请联系管理员。
-        
-        MCSS 团队
-        """
-        
-        return await self.send_email(to_email, subject, body)
+        variables = {
+            'server_name': server_name
+        }
+        return await self.send_email_with_template(to_email, 'email_verification_test', variables)
     
     async def send_server_offline_email(self, to_email: str, server_name: str, server_address: str) -> bool:
         """
         发送服务器离线通知邮件
         """
-        subject = f"【MCSS】服务器 {server_name} 离线通知"
-        body = f"""
-        尊敬的服主：
-        
-        您的服务器 {server_name} 已离线，请及时检查。
-        
-        服务器信息：
-        - 服务器名称：{server_name}
-        - 服务器地址：{server_address}
-        - 离线时间：{self.get_current_time()}
-        
-        如有疑问，请联系管理员。
-        
-        MCSS 团队
-        """
-        
-        return await self.send_email(to_email, subject, body)
+        variables = {
+            'server_name': server_name,
+            'server_address': server_address,
+            'offline_time': self.get_current_time()
+        }
+        return await self.send_email_with_template(to_email, 'server_offline', variables)
     
     def get_current_time(self) -> str:
         """
@@ -172,72 +174,42 @@ class EmailService:
         """
         发送服务器创建通知邮件
         """
-        subject = f"【MCSS】新服务器上传通知"
-        frontend_url = settings.FRONTEND_URL
-        body = f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6;">
-        <h2>尊敬的管理员：</h2>
+        variables = {
+            'server_name': server_name,
+            'owner_name': owner_name,
+            'server_address': server_address,
+            'create_time': create_time,
+            'frontend_url': settings.FRONTEND_URL,
+            'approve_token': approve_token,
+            'reject_token': reject_token
+        }
         
-        <p>有新的服务器上传，请及时审核。</p>
+        # 渲染模板
+        rendered = email_template_service.render_template('server_create_notification', variables)
+        if not rendered:
+            print("Failed to render server_create_notification template")
+            return False
         
-        <h3>服务器信息：</h3>
-        <ul>
-        <li><strong>服务器名称：</strong>{server_name}</li>
-        <li><strong>服主名称：</strong>{owner_name}</li>
-        <li><strong>服务器地址：</strong>{server_address}</li>
-        <li><strong>创建时间：</strong>{create_time}</li>
-        </ul>
-        
-        <h3>快捷审核：</h3>
-        <p>
-        <a href="{frontend_url}/admin/servers/approve?token={approve_token}" 
-           style="display: inline-block; padding: 8px 16px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 4px; margin-right: 10px;">
-            通过
-        </a>
-        <a href="{frontend_url}/admin/servers/reject?token={reject_token}" 
-           style="display: inline-block; padding: 8px 16px; background-color: #f44336; color: white; text-decoration: none; border-radius: 4px;">
-            拒绝
-        </a>
-        </p>
-        
-        <p>请登录管理后台查看详细信息并审核。</p>
-        
-        <p>此致<br>MinecraftXF 团队</p>
-        </body>
-        </html>
-        """
-        
-        return await self.send_admin_notification(subject, body, is_html=True)
+        return await self.send_admin_notification(rendered['subject'], rendered['body'], is_html=True)
     
     async def send_server_update_notification(self, server_name: str, owner_name: str, server_address: str, update_time: str) -> bool:
         """
         发送服务器更新通知邮件
         """
-        subject = f"【MCSS】服务器修改通知"
-        body = f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6;">
-        <h2>尊敬的管理员：</h2>
+        variables = {
+            'server_name': server_name,
+            'owner_name': owner_name,
+            'server_address': server_address,
+            'update_time': update_time
+        }
         
-        <p>有服务器信息被修改，请及时查看。</p>
+        # 渲染模板
+        rendered = email_template_service.render_template('server_update_notification', variables)
+        if not rendered:
+            print("Failed to render server_update_notification template")
+            return False
         
-        <h3>服务器信息：</h3>
-        <ul>
-        <li><strong>服务器名称：</strong>{server_name}</li>
-        <li><strong>服主名称：</strong>{owner_name}</li>
-        <li><strong>服务器地址：</strong>{server_address}</li>
-        <li><strong>修改时间：</strong>{update_time}</li>
-        </ul>
-        
-        <p>请登录管理后台查看详细信息。</p>
-        
-        <p>此致<br>MinecraftXF 团队</p>
-        </body>
-        </html>
-        """
-        
-        return await self.send_admin_notification(subject, body, is_html=True)
+        return await self.send_admin_notification(rendered['subject'], rendered['body'], is_html=True)
 
 
 # 创建全局邮件服务实例

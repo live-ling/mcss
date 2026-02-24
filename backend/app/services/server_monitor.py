@@ -41,6 +41,7 @@ class ServerMonitor:
         self.detection_cache: Dict[str, Dict] = {}  # 服务器ID -> 检测结果缓存
         self.api_call_times: List[float] = []  # 第三方 API 调用时间记录
         self.max_api_calls_per_minute = 60  # 每分钟最大 API 调用次数
+        self.last_player_count_record_time: Dict[str, float] = {}  # 服务器ID -> 上次记录在线人数时间
     
     def _is_api_rate_limited(self) -> bool:
         """
@@ -161,16 +162,17 @@ class ServerMonitor:
             print(f"Error checking server {server_id} status via API: {e}")
             return False
     
-    async def check_server_status(self, server_id: str, ip: str, port: int) -> Tuple[bool, str, int]:
+    async def check_server_status(self, server_id: str, ip: str, port: int) -> Tuple[bool, str, int, int]:
         """
         检查服务器状态
         实现多层检测机制：系统检测 → Minecraft 协议检测 → ICMP ping → 第三方 API
         至少两种检测方式成功才认为服务器在线
-        返回 (is_online, check_ip, check_port)
+        返回 (is_online, check_ip, check_port, online_players)
         """
         # 尝试解析SRV记录
         check_ip = ip
         check_port = port
+        online_players = 0
         
         # 检查是否为域名（不是IP地址）
         try:
@@ -196,24 +198,43 @@ class ServerMonitor:
         detection_results['socket'] = await self._socket_check(check_ip, check_port)
         
         # 2. Minecraft 服务器协议检测
-        detection_results['minecraft'] = await self._minecraft_check(check_ip, check_port)
+        try:
+            if JavaServer:
+                server = JavaServer(check_ip, check_port)
+                status = await asyncio.to_thread(server.status)
+                detection_results['minecraft'] = True
+                online_players = status.players.online
+        except Exception:
+            pass
         
         # 3. ICMP ping 检测
         detection_results['ping'] = await self._ping_check(check_ip)
         
         # 4. 第三方 API 检测（备用）
-        detection_results['api'] = await self._api_check(server_id, check_ip, check_port)
+        try:
+            if not self._is_api_rate_limited():
+                async with aiohttp.ClientSession() as session:
+                    url = f"https://uapis.cn/api/v1/game/minecraft/serverstatus?server={check_ip}:{check_port}"
+                    async with session.get(url, timeout=aiohttp.ClientTimeout(total=3)) as response:
+                        self._record_api_call()
+                        if response.status == 200:
+                            data = await response.json()
+                            detection_results['api'] = data.get("online", False)
+                            if data.get("online", False):
+                                online_players = data.get("players", 0)
+        except Exception as e:
+            print(f"Error checking server {server_id} status via API: {e}")
         
         # 统计成功的检测次数，优先考虑Minecraft协议检测和socket检测
         success_count = 0
         
         # Minecraft协议检测成功，直接认为在线
         if detection_results['minecraft']:
-            return True, check_ip, check_port
+            return True, check_ip, check_port, online_players
         
         # socket检测成功，认为在线
         if detection_results['socket']:
-            return True, check_ip, check_port
+            return True, check_ip, check_port, online_players
         
         # 其他检测方式作为辅助
         if detection_results['ping']:
@@ -224,9 +245,9 @@ class ServerMonitor:
         # 至少两种辅助检测方式成功才认为服务器在线
         is_online = success_count >= 2
         
-        print(f"Server {server_id} status: {is_online}, Detection results: {detection_results}")
+        print(f"Server {server_id} status: {is_online}, Detection results: {detection_results}, Online players: {online_players}")
         
-        return is_online, check_ip, check_port
+        return is_online, check_ip, check_port, online_players
     
     async def monitor_server(self, server_id: str):
         """
@@ -240,8 +261,17 @@ class ServerMonitor:
                     (server_id,)
                 )
                 
-                if not config or not config.get("notify_enabled"):
-                    # 如果通知未启用，暂停监控
+                if not config:
+                    # 如果配置不存在，暂停监控
+                    await asyncio.sleep(60)  # 每分钟检查一次配置
+                    continue
+                
+                # 检查是否需要监控
+                notify_enabled = config.get("notify_enabled", False)
+                player_count_enabled = config.get("player_count_enabled", False)
+                
+                if not notify_enabled and not player_count_enabled:
+                    # 如果通知和在线人数统计都未启用，暂停监控
                     await asyncio.sleep(60)  # 每分钟检查一次配置
                     continue
                 
@@ -265,11 +295,40 @@ class ServerMonitor:
                     ip = ip_address
                     port = 25565
                 
-                is_online, check_ip, check_port = await self.check_server_status(
+                is_online, check_ip, check_port, online_players = await self.check_server_status(
                     server_id,
                     ip,
                     port
                 )
+                
+                # 如果启用了在线人数统计，更新服务器的在线人数
+                if config.get("player_count_enabled", False):
+                    db.execute(
+                        "UPDATE servers SET online_players = %s WHERE id = %s",
+                        (online_players, server_id)
+                    )
+                    db.commit()
+                    
+                    # 每5分钟记录一次在线人数历史数据
+                    current_time = time.time()
+                    last_record_time = self.last_player_count_record_time.get(server_id, 0)
+                    if current_time - last_record_time >= 300:  # 5分钟 = 300秒
+                        try:
+                            # 生成唯一ID
+                            record_id = str(uuid.uuid4())
+                            # 获取服务器的最大玩家数
+                            max_players = server.get('max_players', 0)
+                            # 插入历史记录
+                            db.execute(
+                                "INSERT INTO server_player_count_history (id, server_id, timestamp, player_count, max_players) VALUES (%s, %s, %s, %s, %s)",
+                                (record_id, server_id, time.strftime('%Y-%m-%d %H:%M:%S', time.localtime()), online_players, max_players)
+                            )
+                            db.commit()
+                            # 更新上次记录时间
+                            self.last_player_count_record_time[server_id] = current_time
+                            print(f"Recorded player count history for server {server_id}: {online_players} players")
+                        except Exception as e:
+                            print(f"Error recording player count history: {e}")
                 
                 # 获取上一次状态
                 last_status = self.server_status_history.get(server_id)
@@ -374,27 +433,17 @@ class ServerMonitor:
             
             print(f"Sending offline notification for server {server.get('name')}: email={email}, email_verified={email_verified}")
             
-            # 构建邮件内容
-            subject = f"【MCSS】服务器 {server.get('name')} 离线通知"
-            body = f"""
-            尊敬的服主：
-            
-            您的服务器【 {server.get('name')} 】已离线，请及时检查。
-            
-            服务器信息：
-            - 服务器名称：{server.get('name')}
-            - 联机地址：{server.get('ip_address')}
-            - 离线时间：{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}
-            
-            如有疑问，请联系管理员。
-            
-            MinecraftXF 团队
-            """
+            # 构建邮件变量
+            variables = {
+                'server_name': server.get('name'),
+                'server_address': server.get('ip_address'),
+                'offline_time': time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
+            }
             
             # 发送邮件
             email_sent = False
             if email and email_verified:
-                email_sent = await self.email_service.send_email(email, subject, body)
+                email_sent = await self.email_service.send_email_with_template(email, 'server_offline', variables)
                 print(f"Email sent result: {email_sent}")
             else:
                 print(f"Email not sent: email={email}, email_verified={email_verified}")
@@ -421,30 +470,20 @@ class ServerMonitor:
             
             print(f"Sending online notification for server {server.get('name')}: email={email}, email_verified={email_verified}")
             
-            # 构建邮件内容
-            subject = f"【MCSS】服务器 {server.get('name')} 上线通知"
-            body = f"""
-            尊敬的服主：
-            
-            您的服务器【 {server.get('name')} 】已上线。
-            
-            服务器信息：
-            - 服务器名称：{server.get('name')}
-            - 联机地址：{server.get('ip_address')}
-            - 解析地址：{check_ip}:{check_port}
-            - 上线时间：{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}
-            
-            如有疑问，请联系管理员。
-            
-            MinecraftXF 团队
-            """
+            # 构建邮件变量
+            variables = {
+                'server_name': server.get('name'),
+                'server_address': server.get('ip_address'),
+                'resolved_address': f"{check_ip}:{check_port}",
+                'online_time': time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
+            }
             
             print(f"Online notification: server_address={server.get('ip_address')}, resolved_address={check_ip}:{check_port}")
             
             # 发送邮件
             email_sent = False
             if email and email_verified:
-                email_sent = await self.email_service.send_email(email, subject, body)
+                email_sent = await self.email_service.send_email_with_template(email, 'server_online', variables)
                 print(f"Email sent result: {email_sent}")
             else:
                 print(f"Email not sent: email={email}, email_verified={email_verified}")
@@ -460,9 +499,9 @@ class ServerMonitor:
         """
         启动所有服务器的监控
         """
-        # 获取所有启用了通知的服务器
+        # 获取所有启用了通知或在线人数统计的服务器
         servers = db.fetch_all(
-            "SELECT server_id FROM server_notification_configs WHERE notify_enabled = 1"
+            "SELECT server_id FROM server_notification_configs WHERE notify_enabled = 1 OR player_count_enabled = 1"
         )
         
         for server in servers:

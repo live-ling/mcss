@@ -8,6 +8,7 @@ from app.api import auth, users, servers, comments, upload, public_servers, netw
 from app.config import settings
 from app.utils.database import db
 from app.services.server_monitor import server_monitor
+from app.services.email_template_service import email_template_service
 
 app = FastAPI(
     title="MCSS Backend API",
@@ -18,11 +19,12 @@ app = FastAPI(
 # 配置CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://mcss.liveling.top", "http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:5174", "http://127.0.0.1:5174"],
+    allow_origins=["https://mcss.liveling.top", "http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:5174", "http://127.0.0.1:5174", "http://localhost:3000", "https://api-mcss.liveling.top"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],
+    max_age=86400,  # 预检请求结果缓存时间，单位秒
 )
 
 # 初始化 SMTP 配置
@@ -151,7 +153,17 @@ app.include_router(public_servers.router, prefix="/api/public/servers", tags=["p
 app.include_router(comments.router, prefix="/api/comments", tags=["comments"])
 app.include_router(upload.router, prefix="/api/upload", tags=["upload"])
 app.include_router(network.router, prefix="/api/network", tags=["network"])
-app.include_router(admin.router, tags=["admin"])
+app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
+
+# 添加不带 /api 前缀的路由，兼容前端请求
+print("Including public routers without /api prefix...")
+app.include_router(public_servers.router, prefix="/public/servers", tags=["public_servers"])
+app.include_router(auth.router, prefix="/auth", tags=["authentication"])
+app.include_router(users.router, prefix="/users", tags=["users"])
+app.include_router(servers.router, prefix="/servers", tags=["servers"])
+app.include_router(comments.router, prefix="/comments", tags=["comments"])
+app.include_router(upload.router, prefix="/upload", tags=["upload"])
+app.include_router(admin.router, prefix="/admin", tags=["admin"])
 
 @app.get("/")
 async def root():
@@ -329,6 +341,11 @@ async def get_public_latest_servers(
 @app.on_event("startup")
 async def startup_event():
     """应用启动事件"""
+    print("Creating missing email templates...")
+    # 创建缺失的邮件模板
+    email_template_service.create_missing_templates()
+    print("Email templates initialized successfully")
+    
     print("Starting server monitor...")
     # 启动服务器监控服务
     asyncio.create_task(server_monitor.start_monitoring())

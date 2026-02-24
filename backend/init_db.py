@@ -35,14 +35,14 @@ def create_database():
             cursor = conn.cursor()
             
             # 创建数据库
-            cursor.execute('CREATE DATABASE IF NOT EXISTS mcss')
+            cursor.execute(f'CREATE DATABASE IF NOT EXISTS {database}')
             print('数据库创建成功')
             
-            # 切换到mcss数据库
-            cursor.execute('USE mcss')
+            # 切换到指定数据库
+            cursor.execute(f'USE {database}')
             
             # 设置字符集和排序规则
-            cursor.execute('ALTER DATABASE mcss CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci')
+            cursor.execute(f'ALTER DATABASE {database} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci')
             print('数据库字符集设置成功')
             
             # 从SQL文件中读取并执行SQL语句
@@ -54,8 +54,8 @@ def create_database():
                 with open(sql_file_path, 'r', encoding='utf-8') as f:
                     sql_content = f.read()
                 
-                # 按分号分割SQL语句
-                sql_statements = sql_content.split(';')
+                # 按分号分割SQL语句，但要注意处理字符串中的分号
+                sql_statements = re.split(r';\s*$', sql_content, flags=re.MULTILINE)
                 
                 # 执行每个SQL语句
                 for statement in sql_statements:
@@ -81,9 +81,14 @@ def create_database():
             cursor.execute('''
             INSERT IGNORE INTO email_templates (id, name, subject, content, description, variables) 
             VALUES 
-            ('1', 'verification_code', '验证码', '尊敬的{username}，您的验证码是：{code}', '验证码邮件模板', '["code", "username"]'),
-            ('2', 'server_submitted', '服务器提交通知', '尊敬的管理员，有新的服务器提交审核：{server_name}', '服务器提交通知模板', '["server_name"]'),
-            ('3', 'password_reset', '密码重置通知', '尊敬的{username}，您的密码已重置', '密码重置通知模板', '["username"]')
+            ('1', 'register_verification', '【MCSS】注册验证码', '您的注册验证码是：{{code}}\n\n此验证码有效期为10分钟，请尽快使用完成注册。\n\n如果您没有请求注册，请忽略此邮件。\n\nMCSS 团队', '用户注册时的验证码邮件', '["code"]'),
+            ('2', 'password_reset', '【MCSS】密码重置验证码', '您的密码重置验证码是：{{code}}\n\n此验证码有效期为10分钟，请尽快使用完成密码重置。\n\n如果您没有请求重置密码，请忽略此邮件。\n\nMCSS 团队', '密码重置时的验证码邮件', '["code"]'),
+            ('3', 'owner_verification', '【MCSS】服主入驻验证码', '您的服主入驻验证码是：{{code}}\n\n此验证码有效期为10分钟，请尽快使用完成验证。\n\n完成验证后，您将获得服主权限，可以在平台上发布和管理您的Minecraft服务器。\n\n如果您没有请求入驻，请忽略此邮件。\n\nMCSS 团队', '服主入驻时的验证码邮件', '["code"]'),
+            ('4', 'server_offline', '【MCSS】服务器 {{server_name}} 离线通知', '尊敬的服主：\n\n您的服务器 {{server_name}} 已离线，请及时检查。\n\n服务器信息：\n- 服务器名称：{{server_name}}\n- 服务器地址：{{server_address}}\n- 离线时间：{{offline_time}}\n\n如有疑问，请联系管理员。\n\nMCSS 团队', '服务器离线通知邮件', '["server_name", "server_address", "offline_time"]'),
+            ('5', 'server_online', '【MCSS】服务器 {{server_name}} 上线通知', '尊敬的服主：\n\n您的服务器 {{server_name}} 已上线。\n\n服务器信息：\n- 服务器名称：{{server_name}}\n- 服务器地址：{{server_address}}\n- 解析地址：{{resolved_address}}\n- 上线时间：{{online_time}}\n\n如有疑问，请联系管理员。\n\nMCSS 团队', '服务器上线通知邮件', '["server_name", "server_address", "resolved_address", "online_time"]'),
+            ('6', 'server_create_notification', '【MCSS】新服务器上传通知', '<html>\n<body style="font-family: Arial, sans-serif; line-height: 1.6;">\n<h2>尊敬的管理员：</h2>\n\n<p>有新的服务器上传，请及时审核。</p>\n\n<h3>服务器信息：</h3>\n<ul>\n<li><strong>服务器名称：</strong>{{server_name}}</li>\n<li><strong>服主名称：</strong>{{owner_name}}</li>\n<li><strong>服务器地址：</strong>{{server_address}}</li>\n<li><strong>创建时间：</strong>{{create_time}}</li>\n</ul>\n\n<h3>快捷审核：</h3>\n<p>\n<a href="{{frontend_url}}/admin/servers/approve?token={{approve_token}}" \n   style="display: inline-block; padding: 8px 16px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 4px; margin-right: 10px;">\n    通过\n</a>\n<a href="{{frontend_url}}/admin/servers/reject?token={{reject_token}}" \n   style="display: inline-block; padding: 8px 16px; background-color: #f44336; color: white; text-decoration: none; border-radius: 4px;">\n    拒绝\n</a>\n</p>\n\n<p>请登录管理后台查看详细信息并审核。</p>\n\n<p>此致<br>MCSS 团队</p>\n</body>\n</html>', '新服务器上传通知邮件（管理员）', '["server_name", "owner_name", "server_address", "create_time", "frontend_url", "approve_token", "reject_token"]'),
+            ('7', 'server_update_notification', '【MCSS】服务器修改通知', '<html>\n<body style="font-family: Arial, sans-serif; line-height: 1.6;">\n<h2>尊敬的管理员：</h2>\n\n<p>有服务器信息被修改，请及时查看。</p>\n\n<h3>服务器信息：</h3>\n<ul>\n<li><strong>服务器名称：</strong>{{server_name}}</li>\n<li><strong>服主名称：</strong>{{owner_name}}</li>\n<li><strong>服务器地址：</strong>{{server_address}}</li>\n<li><strong>修改时间：</strong>{{update_time}}</li>\n</ul>\n\n<p>请登录管理后台查看详细信息。</p>\n\n<p>此致<br>MCSS 团队</p>\n</body>\n</html>', '服务器修改通知邮件（管理员）', '["server_name", "owner_name", "server_address", "update_time"]'),
+            ('8', 'email_verification_test', '【MCSS】服务器 {{server_name}} 邮箱验证测试', '尊敬的服主：\n\n这是一封服务器 {{server_name}} 的邮箱验证测试邮件，用于确认您的邮箱可以正常接收服务器离线通知。\n\n如果您收到此邮件，说明您的邮箱配置正确，当服务器离线时，您将收到相应的通知邮件。\n\n如有疑问，请联系管理员。\n\nMCSS 团队', '邮箱验证测试邮件', '["server_name"]')
             ''')
             print('默认邮件模板插入成功')
             

@@ -686,6 +686,9 @@ async def create_server(
     server_id = str(uuid.uuid4())
     
     try:
+        # 管理员创建的服务器直接通过审核
+        status = "approved" if current_user.get("role") == "admin" else "pending"
+        
         # 插入服务器记录
         db.execute(
             """
@@ -708,7 +711,7 @@ async def create_server(
                 server_data.requires_genuine,
                 server_data.max_players,
                 0,
-                "pending",  # 初始状态为待审核
+                status,  # 管理员创建的服务器直接通过审核
                 False,
                 0,
                 server_data.group_number,
@@ -848,6 +851,11 @@ async def update_server(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="无权限更新此服务器"
         )
+    
+    # 管理员用户跳过后台验证，直接更新
+    if current_user["role"] == "admin":
+        # 管理员可以更新所有字段，包括状态和推荐标志
+        pass
     
     # 构建更新语句
     update_fields = []
@@ -1814,11 +1822,16 @@ async def check_server_status(
         except Exception:
             pass
         
-        # 统计成功的检测次数
-        success_count = sum(detection_results.values())
-        
-        # 至少两种检测方式成功才认为服务器在线
-        is_online = success_count >= 2
+        # 优先判断：如果 socket 检测成功，直接认为服务器在线
+        if detection_results['socket']:
+            is_online = True
+        # 如果 Minecraft 协议检测成功，直接认为服务器在线
+        elif detection_results['minecraft']:
+            is_online = True
+        # 否则，需要至少两种其他检测方式成功才认为服务器在线
+        else:
+            success_count = sum([detection_results['ping'], detection_results['api']])
+            is_online = success_count >= 2
         
         # 构建响应
         if is_online and api_data:
@@ -1940,6 +1953,7 @@ async def get_server_notification_config(
         return {
             "server_id": server_id,
             "notify_enabled": False,
+            "player_count_enabled": False,
             "check_interval": 30,
             "notification_email": current_user.get("email"),
             "email_verified": False,
@@ -1996,6 +2010,7 @@ async def update_server_notification_config(
                 """
                 UPDATE server_notification_configs SET 
                     notify_enabled = %s, 
+                    player_count_enabled = %s, 
                     check_interval = %s, 
                     notification_email = %s, 
                     server_priority = %s
@@ -2003,6 +2018,7 @@ async def update_server_notification_config(
                 """,
                 (
                     config_data.get("notify_enabled", False),
+                    config_data.get("player_count_enabled", False),
                     config_data.get("check_interval", 30),
                     notification_email,
                     config_data.get("server_priority", "secondary"),
@@ -2015,14 +2031,15 @@ async def update_server_notification_config(
             db.execute(
                 """
                 INSERT INTO server_notification_configs (
-                    id, server_id, notify_enabled, check_interval, 
+                    id, server_id, notify_enabled, player_count_enabled, check_interval, 
                     notification_email, email_verified, server_priority
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     config_id,
                     server_id,
                     config_data.get("notify_enabled", False),
+                    config_data.get("player_count_enabled", False),
                     config_data.get("check_interval", 30),
                     notification_email,
                     False,
@@ -2107,6 +2124,183 @@ async def send_test_email(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="测试邮件发送失败"
+        )
+
+
+@router.get("/{server_id}/player-count-history")
+async def get_player_count_history(
+    server_id: str,
+    start_time: Optional[str] = Query(None, description="开始时间，格式：YYYY-MM-DD HH:MM:SS"),
+    end_time: Optional[str] = Query(None, description="结束时间，格式：YYYY-MM-DD HH:MM:SS"),
+    time_range: Optional[str] = Query(None, description="时间范围：24h, 7d, 30d"),
+    current_user: Optional[dict] = Depends(get_current_user)
+):
+    """获取服务器在线人数历史数据"""
+    try:
+        # 检查服务器是否存在
+        server = db.fetch_one(
+            "SELECT id, owner_id FROM servers WHERE id = %s",
+            (server_id,)
+        )
+        
+        if not server:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="服务器不存在"
+            )
+        
+        # 检查权限：只有服务器所有者或管理员可以查看历史数据
+        if not current_user or (current_user.get("user_id") != server.get("owner_id") and current_user.get("role") != "admin"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="无权限查看此服务器的历史数据"
+            )
+        
+        # 计算时间范围
+        import datetime
+        if time_range:
+            end_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            if time_range == "24h":
+                start_time = (datetime.datetime.now() - datetime.timedelta(hours=24)).strftime('%Y-%m-%d %H:%M:%S')
+            elif time_range == "7d":
+                start_time = (datetime.datetime.now() - datetime.timedelta(days=7)).strftime('%Y-%m-%d %H:%M:%S')
+            elif time_range == "30d":
+                start_time = (datetime.datetime.now() - datetime.timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S')
+        
+        # 构建基础查询语句
+        base_query = "SELECT * FROM server_player_count_history WHERE server_id = %s"
+        params = [server_id]
+        
+        # 添加时间范围过滤
+        if start_time:
+            base_query += " AND timestamp >= %s"
+            params.append(start_time)
+        if end_time:
+            base_query += " AND timestamp <= %s"
+            params.append(end_time)
+        
+        # 执行基础查询
+        history_data = db.fetch_all(base_query, params)
+        
+        # 根据时间范围处理数据
+        formatted_data = []
+        if time_range == "24h":
+            # 24小时：每5分钟的数据
+            # 按5分钟分组，取每组的第一条记录
+            time_groups = {}
+            for record in history_data:
+                timestamp = record.get("timestamp")
+                # 检查timestamp类型
+                if isinstance(timestamp, datetime.datetime):
+                    dt = timestamp
+                else:
+                    # 转换为datetime对象
+                    dt = datetime.datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S')
+                # 按5分钟分组
+                group_key = dt.replace(minute=(dt.minute // 5) * 5, second=0)
+                group_key_str = group_key.strftime('%Y-%m-%d %H:%M:%S')
+                if group_key_str not in time_groups:
+                    time_groups[group_key_str] = record
+            
+            # 转换为有序列表
+            for group_key_str, record in sorted(time_groups.items()):
+                formatted_data.append({
+                    "id": record.get("id"),
+                    "timestamp": group_key_str,
+                    "player_count": record.get("player_count"),
+                    "max_players": record.get("max_players")
+                })
+                
+        elif time_range == "7d":
+            # 7天：每小时最高在线
+            hourly_max = {}
+            for record in history_data:
+                timestamp = record.get("timestamp")
+                # 检查timestamp类型
+                if isinstance(timestamp, datetime.datetime):
+                    dt = timestamp
+                else:
+                    # 转换为datetime对象
+                    dt = datetime.datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S')
+                # 按小时分组
+                group_key = dt.replace(minute=0, second=0)
+                group_key_str = group_key.strftime('%Y-%m-%d %H:%M:%S')
+                
+                if group_key_str not in hourly_max or record.get("player_count") > hourly_max[group_key_str].get("player_count"):
+                    hourly_max[group_key_str] = record
+            
+            # 转换为有序列表
+            for group_key_str, record in sorted(hourly_max.items()):
+                formatted_data.append({
+                    "id": record.get("id"),
+                    "timestamp": group_key_str,
+                    "player_count": record.get("player_count"),
+                    "max_players": record.get("max_players")
+                })
+                
+        elif time_range == "30d":
+            # 30天：每天最高在线
+            daily_max = {}
+            for record in history_data:
+                timestamp = record.get("timestamp")
+                # 检查timestamp类型
+                if isinstance(timestamp, datetime.datetime):
+                    dt = timestamp
+                else:
+                    # 转换为datetime对象
+                    dt = datetime.datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S')
+                # 按天分组
+                group_key = dt.replace(hour=0, minute=0, second=0)
+                group_key_str = group_key.strftime('%Y-%m-%d %H:%M:%S')
+                
+                if group_key_str not in daily_max or record.get("player_count") > daily_max[group_key_str].get("player_count"):
+                    daily_max[group_key_str] = record
+            
+            # 转换为有序列表
+            for group_key_str, record in sorted(daily_max.items()):
+                formatted_data.append({
+                    "id": record.get("id"),
+                    "timestamp": group_key_str,
+                    "player_count": record.get("player_count"),
+                    "max_players": record.get("max_players")
+                })
+                
+        else:
+            # 默认：返回所有数据
+            # 对数据按timestamp排序，需要确保timestamp是可比较的
+            def get_timestamp_key(record):
+                timestamp = record.get("timestamp")
+                if isinstance(timestamp, datetime.datetime):
+                    return timestamp
+                else:
+                    try:
+                        return datetime.datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S')
+                    except:
+                        return timestamp
+            
+            for record in sorted(history_data, key=get_timestamp_key):
+                formatted_data.append({
+                    "id": record.get("id"),
+                    "timestamp": record.get("timestamp"),
+                    "player_count": record.get("player_count"),
+                    "max_players": record.get("max_players"),
+                    "created_at": record.get("created_at")
+                })
+        
+        return {
+            "server_id": server_id,
+            "total_records": len(formatted_data),
+            "data": formatted_data
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting player count history: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="获取历史数据失败"
         )
 
 

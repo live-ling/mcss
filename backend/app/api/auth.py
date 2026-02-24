@@ -155,40 +155,21 @@ async def register(register_data: auth_schemas.RegisterRequest):
         print(f"验证码已生成: {code}")
         return {
             "message": "验证码已发送到邮箱",
+            "username": register_data.username,
             "email": register_data.email
         }
     
     # 发送邮件
     try:
-        import smtplib
-        from email.mime.text import MIMEText
-        from email.mime.multipart import MIMEMultipart
+        from app.services.email_service import email_service
         
-        # 创建邮件
-        msg = MIMEMultipart()
-        msg["From"] = f"{smtp_config['from_name']} <{smtp_config['from_email']}>"
-        msg["To"] = register_data.email
-        msg["Subject"] = "注册验证码"
-        
-        # 邮件内容
-        body = f"您的注册验证码是：{code}\n\n此验证码有效期为10分钟，请尽快使用完成注册。\n\n如果您没有请求注册，请忽略此邮件。"
-        msg.attach(MIMEText(body, "plain", "utf-8"))
-        
-        # 连接SMTP服务器
-        if smtp_config["use_tls"]:
-            server = smtplib.SMTP_SSL(smtp_config["host"], smtp_config["port"])
-        else:
-            server = smtplib.SMTP(smtp_config["host"], smtp_config["port"])
-        
-        # 登录
-        server.login(smtp_config["username"], smtp_config["password"])
+        # 使用模板发送邮件
+        variables = {
+            'code': code
+        }
         
         # 发送邮件
-        server.send_message(msg)
-        
-        # 关闭连接
-        server.quit()
-        
+        await email_service.send_email_with_template(register_data.email, 'register_verification', variables)
         print(f"验证码已发送到 {register_data.email}: {code}")
     except Exception as e:
         print(f"发送邮件失败: {e}")
@@ -447,35 +428,15 @@ async def send_password_reset_code(data: dict):
 
     # 发送邮件
     try:
-        import smtplib
-        from email.mime.text import MIMEText
-        from email.mime.multipart import MIMEMultipart
-
-        # 创建邮件
-        msg = MIMEMultipart()
-        msg["From"] = f"{smtp_config['from_name']} <{smtp_config['from_email']}>"
-        msg["To"] = email
-        msg["Subject"] = "密码重置验证码"
-
-        # 邮件内容
-        body = f"您的密码重置验证码是：{code}\n\n此验证码有效期为10分钟，请尽快使用完成密码重置。\n\n如果您没有请求重置密码，请忽略此邮件。"
-        msg.attach(MIMEText(body, "plain", "utf-8"))
-
-        # 连接SMTP服务器
-        if smtp_config["port"] == 465 or smtp_config["use_tls"]:
-            server = smtplib.SMTP_SSL(smtp_config["host"], smtp_config["port"])
-        else:
-            server = smtplib.SMTP(smtp_config["host"], smtp_config["port"])
-
-        # 登录
-        server.login(smtp_config["username"], smtp_config["password"])
-
+        from app.services.email_service import email_service
+        
+        # 使用模板发送邮件
+        variables = {
+            'code': code
+        }
+        
         # 发送邮件
-        server.send_message(msg)
-
-        # 关闭连接
-        server.quit()
-
+        await email_service.send_email_with_template(email, 'password_reset', variables)
         print(f"验证码已发送到 {email}: {code}")
     except Exception as e:
         print(f"发送邮件失败: {e}")
@@ -642,38 +603,15 @@ async def send_verification_code(data: dict):
     
     # 发送邮件
     try:
-        import smtplib
-        from email.mime.text import MIMEText
-        from email.mime.multipart import MIMEMultipart
+        from app.services.email_service import email_service
         
-        # 创建邮件
-        msg = MIMEMultipart()
-        msg["From"] = f"{smtp_config['from_name']} <{smtp_config['from_email']}>"
-        msg["To"] = email
-        msg["Subject"] = "邮箱验证码"
-        
-        # 邮件内容
-        if verify_type == "owner_verification":
-            body = f"您的腐竹入驻验证码是：{code}\n\n此验证码有效期为10分钟，请尽快使用完成验证。\n\n完成验证后，您将获得服主权限，可以在平台上发布和管理您的Minecraft服务器。"
-        else:
-            body = f"您的验证码是：{code}\n\n此验证码有效期为10分钟，请尽快使用。"
-        msg.attach(MIMEText(body, "plain", "utf-8"))
-        
-        # 连接SMTP服务器
-        if smtp_config["use_tls"]:
-            server = smtplib.SMTP_SSL(smtp_config["host"], smtp_config["port"])
-        else:
-            server = smtplib.SMTP(smtp_config["host"], smtp_config["port"])
-        
-        # 登录
-        server.login(smtp_config["username"], smtp_config["password"])
+        # 使用模板发送邮件
+        variables = {
+            'code': code
+        }
         
         # 发送邮件
-        server.send_message(msg)
-        
-        # 关闭连接
-        server.quit()
-        
+        await email_service.send_email_with_template(email, 'owner_verification', variables)
         print(f"验证码已发送到 {email}: {code}")
     except Exception as e:
         print(f"发送邮件失败: {e}")

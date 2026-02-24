@@ -67,6 +67,13 @@ class Database:
                     print("Connection pool not initialized, reinitializing...")
                     self._init_pool()
                 
+                # 再次检查连接池是否初始化成功
+                if not self.pool:
+                    print("Connection pool initialization failed, retrying...")
+                    attempt += 1
+                    time.sleep(1)
+                    continue
+                
                 # 从连接池获取连接
                 connection = self.pool.get_connection()
                 print("Got connection from pool")
@@ -89,6 +96,13 @@ class Database:
                 print(f"Error getting connection from pool (attempt {attempt+1}/{max_attempts}): {e}")
                 attempt += 1
                 time.sleep(1)  # 等待1秒后重试
+            except AttributeError as e:
+                # 处理连接池为None的情况
+                print(f"AttributeError getting connection: {e}")
+                print("Connection pool is None, reinitializing...")
+                self._init_pool()
+                attempt += 1
+                time.sleep(1)
         
         # 如果所有尝试都失败，抛出异常
         raise Error("Failed to get database connection after multiple attempts")
@@ -102,6 +116,12 @@ class Database:
             return connection
         except Error as e:
             print(f"Error connecting to database: {e}")
+            raise
+        except Exception as e:
+            # 捕获其他异常，包括AttributeError
+            print(f"Unexpected error connecting to database: {e}")
+            # 尝试重新初始化连接池
+            self._init_pool()
             raise
     
     def disconnect(self, connection, cursor=None):
@@ -217,6 +237,11 @@ class Database:
                 else:
                     # 非连接错误，直接抛出
                     raise
+            except Exception as e:
+                # 捕获其他异常，包括AttributeError
+                print(f"Unexpected error fetching all results: {e}")
+                # 连接错误，尝试重试
+                attempt += 1
             finally:
                 # 关闭连接和游标
                 if cursor:
@@ -230,8 +255,9 @@ class Database:
                     except:
                         pass
         
-        # 如果所有尝试都失败，抛出异常
-        raise Error("Failed to fetch all results after multiple attempts")
+        # 如果所有尝试都失败，返回空列表
+        print("All attempts to fetch all results failed, returning empty list")
+        return []
     
     def fetch_one(self, query, params=None):
         """获取单个查询结果"""
@@ -270,6 +296,11 @@ class Database:
                 else:
                     # 非连接错误，直接抛出
                     raise
+            except Exception as e:
+                # 捕获其他异常，包括AttributeError
+                print(f"Unexpected error fetching one result: {e}")
+                # 连接错误，尝试重试
+                attempt += 1
             finally:
                 # 关闭连接和游标
                 if cursor:
@@ -283,8 +314,9 @@ class Database:
                     except:
                         pass
         
-        # 如果所有尝试都失败，抛出异常
-        raise Error("Failed to fetch one result after multiple attempts")
+        # 如果所有尝试都失败，返回None
+        print("All attempts to fetch one result failed, returning None")
+        return None
     
     def fetch_count(self, query, params=None):
         """获取查询结果数量"""
@@ -306,7 +338,14 @@ class Database:
                 
                 # 获取结果
                 result = cursor.fetchone()
-                return result['count'] if result else 0
+                if result:
+                    # 尝试获取count列，如果不存在则获取第一个键的值
+                    if 'count' in result:
+                        return result['count']
+                    else:
+                        # 对于COUNT(*)查询，返回第一个值
+                        return list(result.values())[0] if result else 0
+                return 0
             except Error as e:
                 print(f"Error fetching count (attempt {attempt+1}/{max_attempts}): {e}")
                 
@@ -323,6 +362,11 @@ class Database:
                 else:
                     # 非连接错误，直接抛出
                     raise
+            except Exception as e:
+                # 捕获其他异常，包括AttributeError
+                print(f"Unexpected error fetching count: {e}")
+                # 连接错误，尝试重试
+                attempt += 1
             finally:
                 # 关闭连接和游标
                 if cursor:
@@ -336,8 +380,9 @@ class Database:
                     except:
                         pass
         
-        # 如果所有尝试都失败，抛出异常
-        raise Error("Failed to fetch count after multiple attempts")
+        # 如果所有尝试都失败，返回0
+        print("All attempts to fetch count failed, returning 0")
+        return 0
 
 
 # 创建全局数据库实例

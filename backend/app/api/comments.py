@@ -38,14 +38,20 @@ async def create_comment(
     comment_id = str(uuid.uuid4())
     
     try:
+        # 管理员创建的评论直接通过审核
+        is_approved = True if current_user.get("role") == "admin" else False
+        
         # 插入评论
         db.execute(
             "INSERT INTO server_comments (id, server_id, user_id, content, is_approved) VALUES (%s, %s, %s, %s, %s)",
-            (comment_id, server_id, current_user["user_id"], content.strip(), False)  # 初始状态为待审核
+            (comment_id, server_id, current_user["user_id"], content.strip(), is_approved)
         )
         db.commit()
         
-        return {"message": "评论已提交，等待审核", "comment_id": comment_id}
+        if is_approved:
+            return {"message": "评论创建成功", "comment_id": comment_id}
+        else:
+            return {"message": "评论已提交，等待审核", "comment_id": comment_id}
     except Exception as e:
         db.rollback()
         raise HTTPException(

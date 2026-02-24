@@ -7,7 +7,7 @@ from app.auth.dependencies import get_admin_user
 from app.utils.database import db
 from app.schemas import servers as servers_schemas
 
-router = APIRouter(prefix="/api/admin", tags=["admin"])
+router = APIRouter(prefix="", tags=["admin"])
 
 
 @router.get("/servers/pending")
@@ -1077,4 +1077,145 @@ async def update_site_settings(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="更新站点设置失败"
+        )
+
+
+@router.get("/stats")
+async def get_stats(
+    current_user: dict = Depends(get_admin_user)
+):
+    """获取统计数据"""
+    try:
+        # 获取服务器统计数据
+        total_servers = db.fetch_count("SELECT COUNT(*) FROM servers")
+        # 在线服务器判断逻辑，基于服务器状态，在线人数可以为0
+        online_servers = db.fetch_count("SELECT COUNT(*) FROM servers WHERE status = 'approved'")
+        offline_servers = total_servers - online_servers
+        
+        # 获取用户统计数据
+        total_users = db.fetch_count("SELECT COUNT(*) FROM users")
+        owner_users = db.fetch_count("SELECT COUNT(*) FROM profiles WHERE role = 'owner'")
+        player_users = db.fetch_count("SELECT COUNT(*) FROM profiles WHERE role = 'player'")
+        
+        # 构建响应
+        stats_response = {
+            "total_servers": total_servers,
+            "online_servers": online_servers,
+            "offline_servers": offline_servers,
+            "total_users": total_users,
+            "owner_users": owner_users,
+            "player_users": player_users
+        }
+        
+        return stats_response
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="获取统计数据失败"
+        )
+
+
+@router.get("/stats/player-count")
+async def get_player_count_stats(
+    time_range: str = "24h",  # 24h, 7d, 30d
+    server_ids: str = None,  # 逗号分隔的服务器ID列表
+    current_user: dict = Depends(get_admin_user)
+):
+    """获取服务器在线玩家统计数据"""
+    try:
+        # 解析服务器ID列表
+        if server_ids:
+            server_id_list = server_ids.split(",")
+            server_condition = "server_id IN ({})"
+            server_condition = server_condition.format(",".join(["%s"] * len(server_id_list)))
+            params = server_id_list
+        else:
+            server_condition = "1=1"
+            params = []
+        
+        # 获取服务器列表
+        servers_query = "SELECT id, name FROM servers WHERE status = 'approved'"
+        if server_ids:
+            servers_query += f" AND id IN ({','.join(['%s'] * len(server_id_list))})"
+        servers = db.fetch_all(servers_query, params if server_ids else [])
+        
+        # 获取每个服务器的在线玩家数据
+        result = []
+        for server in servers:
+            # 根据时间范围构建查询
+            if time_range == "24h":
+                # 24小时：按5分钟分组，显示平均值
+                query = """
+                    SELECT 
+                        DATE_FORMAT(timestamp, '%Y-%m-%d %H:%i') as time_point,
+                        MAX(player_count) as max_players,
+                        MIN(player_count) as min_players,
+                        AVG(player_count) as avg_players
+                    FROM server_player_count_history
+                    WHERE server_id = %s AND timestamp >= NOW() - INTERVAL 24 HOUR
+                    GROUP BY DATE_FORMAT(timestamp, '%Y-%m-%d %H:%i')
+                    ORDER BY time_point
+                """
+            elif time_range == "7d":
+                # 7天：按小时分组，显示最高值
+                query = """
+                    SELECT 
+                        DATE_FORMAT(timestamp, '%Y-%m-%d %H:00') as time_point,
+                        MAX(player_count) as max_players,
+                        MIN(player_count) as min_players,
+                        AVG(player_count) as avg_players
+                    FROM server_player_count_history
+                    WHERE server_id = %s AND timestamp >= NOW() - INTERVAL 7 DAY
+                    GROUP BY DATE_FORMAT(timestamp, '%Y-%m-%d %H:00')
+                    ORDER BY time_point
+                """
+            elif time_range == "30d":
+                # 30天：按天分组，显示最高值
+                query = """
+                    SELECT 
+                        DATE(timestamp) as time_point,
+                        MAX(player_count) as max_players,
+                        MIN(player_count) as min_players,
+                        AVG(player_count) as avg_players
+                    FROM server_player_count_history
+                    WHERE server_id = %s AND timestamp >= NOW() - INTERVAL 30 DAY
+                    GROUP BY DATE(timestamp)
+                    ORDER BY time_point
+                """
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="无效的时间范围，支持的值：24h, 7d, 30d"
+                )
+            
+            # 执行查询
+            data = db.fetch_all(query, (server["id"],))
+            
+            # 构建服务器数据
+            server_data = {
+                "server_id": server["id"],
+                "server_name": server["name"],
+                "data": [
+                    {
+                        "time_point": item["time_point"],
+                        "max_players": item["max_players"],
+                        "min_players": item["min_players"],
+                        "avg_players": item["avg_players"]
+                    }
+                    for item in data
+                ]
+            }
+            result.append(server_data)
+        
+        return {
+            "time_range": time_range,
+            "servers": result
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"获取玩家统计数据失败: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取玩家统计数据失败: {str(e)}"
         )
